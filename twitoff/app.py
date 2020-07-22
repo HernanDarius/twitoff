@@ -1,13 +1,15 @@
 """Main app/routing file for TwitOff."""
 
-from flask import Flask, render_template
+from os import getenv
+from flask import Flask, render_template, request
 from .models import DB, User
-from .twitter import add_users
+from .predict import predict_user
+from .twitter import add_users, add_or_update_user, update_all_users
 
 def create_app():
     """ Create and configures an instance of the Flask application"""
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+    app.config['SQLALCHEMY_DATABASE_URI'] = getenv('DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_NOTIFICATIONS'] = False
     DB.init_app(app)
 
