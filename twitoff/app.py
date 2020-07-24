@@ -4,7 +4,7 @@ from os import getenv
 from flask import Flask, render_template, request
 from .models import DB, User
 from .predict import predict_user
-from .twitter import add_users, add_or_update_user, update_all_users
+from .twitter import add_or_update_user, update_all_users
 
 def create_app():
     """ Create and configures an instance of the Flask application"""
@@ -15,18 +15,51 @@ def create_app():
 
     @app.route('/')
     def root():
-        return render_template('base.html')
+        return render_template('base.html', title='Home',
+                                users=User.query.all())
     
-    @app.route('/add_users')
-    def add_user():
+    @app.route('/user', methods=['POST'])
+    @app.route('/user/<name>', methods=['GET'])
+    def user(name=None, message=''):
+        name = name or request.values['user_name']
+        try:
+            if request.method == 'POST':
+                add_or_update_user(name)
+                message = "User {} successfully added!".format(name)
+            tweets = User.query.filter(User.name == name).one().tweets
+        except Exception as e:
+            message = "Error adding {}: {}".format(name, e)
+            tweets = []
+        return render_template('user.html', title=name, tweets=tweets,
+                               message=message)
+
+    @app.route('/compare', methods=['POST'])
+    def compare(message=''):
+        user1, user2 = sorted([request.values['user1'],
+                               request.values['user2']])
+        if user1 == user2:
+            message = 'Cannot compare a user to themselves!'
+        else:
+            prediction = predict_user(user1, user2,
+                                      request.values['tweet_text'])
+            message = '{} is more likely to say "{}" than {}.'.format(
+                user1 if prediction else user2, 
+                request.values['tweet_text'],
+                user2 if prediction else user1
+            )
+        return render_template('predictions.html', title='Prediction',
+                                message=message)
+
+    @app.route('/reset')
+    def reset():
         DB.drop_all() #Always reset first
         DB.create_all()
-        add_users
-        return 'Users added!'
+        return render_template('base.html', title='Reset database')
 
-    @app.route('/view_users')
-    def view_user():
-        users = User.query.all()
-        return '\n'.join([str(user) for user in users])
+    @app.route('/update')
+    def update():
+        update_all_users()
+        return render_template('base.html', users=User.query.all(),
+                               title='All users and tweets updated!')
 
     return app
